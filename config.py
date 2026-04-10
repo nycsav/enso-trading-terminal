@@ -32,3 +32,19 @@ CONFLUENCE_WEIGHTS = {
 DASH_HOST = "0.0.0.0"
 DASH_PORT = int(os.environ.get("PORT", 8050))
 DASH_DEBUG = os.environ.get("DASH_DEBUG", "false").lower() == "true"
+
+# ML Strategy defaults
+ML_FORWARD_DAYS = 15  # Prediction horizon
+ML_THRESHOLD_PCT = 2.0  # Min move to trigger signal
+ML_MIN_CONFIDENCE = 55.0  # Min model confidence to trade
+ML_N_ESTIMATORS = 200
+ML_MAX_DEPTH = 4
+ML_LEARNING_RATE = 0.05
+
+# RL Agent defaults
+RL_ALPHA = 0.1  # Learning rate
+RL_GAMMA = 0.95  # Discount factor
+RL_EPSILON = 0.15  # Exploration rate
+
+# LLM / Perplexity API
+PPLX_API_KEY = os.environ.get("PPLX_API_KEY", "")
