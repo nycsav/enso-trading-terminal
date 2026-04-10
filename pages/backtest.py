@@ -15,7 +15,7 @@ import numpy as np
 import io
 from datetime import datetime, timedelta
 
-from modules.backtester import run_backtest, walk_forward_optimization
+from modules.backtester import run_backtest, walk_forward_optimization, run_ml_backtest
 from modules.research import fetch_market_data
 from modules.sr_engine import find_pivots
 from config import SYMBOLS, DEFAULT_CAPITAL, DEFAULT_OPTION_EXPIRY_WEEKS
@@ -106,6 +106,17 @@ layout = html.Div([
 
     # Action buttons
     html.Div([
+                    dcc.Dropdown(
+                id="bt-strategy",
+                options=[
+                    {"label": "S/R Mean Reversion", "value": "sr"},
+                    {"label": "ML Gradient Boosted Trees", "value": "ml"},
+                ],
+                value="sr",
+                clearable=False,
+                style={"width": "220px", "marginRight": "10px", "display": "inline-block",
+                       "verticalAlign": "middle"},
+            ),
         html.Button("Run Backtest", id="bt-run-btn", n_clicks=0,
                      className="btn-primary",
                      style={"marginRight": "10px", "padding": "10px 24px",
@@ -207,11 +218,13 @@ PAPER_BG = "#1a1a2e"
      State("bt-proximity", "value"),
      State("bt-expiry", "value"),
      State("bt-capital", "value"),
-     State("bt-position-size", "value")],
+     State("bt-position-size", "value",)
+         State("bt-strategy", "value"),],
     prevent_initial_call=True,
 )
 def run_backtest_callback(n_clicks, symbols, start_date, end_date,
-                          proximity, expiry, capital, position_size):
+                          proximity, expiry, capital, position_size)
+                         strategy,:
     """Run backtest and update all charts."""
     if not symbols:
         empty = go.Figure()
@@ -231,13 +244,21 @@ def run_backtest_callback(n_clicks, symbols, start_date, end_date,
         if df.empty or len(df) < 30:
             continue
 
-        result = run_backtest(
-            df, symbol=symbol,
-            proximity_threshold_pct=proximity,
-            option_expiry_weeks=expiry,
-            starting_capital=capital,
-            position_size_pct=position_size,
-        )
+        if strategy == "ml":
+            result = run_ml_backtest(
+                df, symbol=symbol,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
+        else:
+            result = run_backtest(
+                df, symbol=symbol,
+                proximity_threshold_pct=proximity,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
 
         if "error" not in result:
             all_trades.extend(result["trades"])
