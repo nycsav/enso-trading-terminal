@@ -1,0 +1,47 @@
+name: CI - Smoke Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate all module imports
+        run: |
+          python -c "
+import app
+import config
+import modules
+import modules.sr_engine
+import modules.backtester
+import modules.api_client
+import modules.research
+import modules.scheduled_tasks
+import pages
+import pages.backtest
+print('All module imports successful!')
+"
+
+      - name: Check app server is exposed
+        run: |
+          python -c "
+from app import server
+assert server is not None, 'server object not found'
+print('Server object verified for gunicorn deployment')
+"
