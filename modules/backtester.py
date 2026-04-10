@@ -437,3 +437,193 @@ def run_multi_symbol_backtest(
         "combined_trades": combined_trades,
         "symbols": symbols,
     }
+
+
+def run_ml_backtest(
+    df: pd.DataFrame,
+    symbol: str = "",
+    option_expiry_weeks: int = DEFAULT_OPTION_EXPIRY_WEEKS,
+    starting_capital: float = DEFAULT_CAPITAL,
+    position_size_pct: float = DEFAULT_POSITION_SIZE_PCT,
+    min_confidence: float = 55.0,
+    train_ratio: float = WALK_FORWARD_TRAIN_RATIO,
+) -> dict:
+    """
+    Run ML-powered backtest using Gradient Boosted Trees.
+    
+    1. Split data into train/test
+    2. Train ML model on training data
+    3. Generate signals on test data
+    4. Price options and track P&L
+    
+    Returns results dict compatible with existing dashboard.
+    """
+    from modules.ml_strategy import MLStrategy
+    from modules.rl_agent import RLPositionSizer, TradingState
+
+    if len(df) < 100:
+        return {"error": "Insufficient data for ML backtest (need 100+ bars)"}
+
+    # Split data
+    split_idx = int(len(df) * train_ratio)
+    train_df = df.iloc[:split_idx].copy()
+    test_df = df.iloc[split_idx:].copy()
+
+    if len(train_df) < 80 or len(test_df) < 20:
+        return {"error": "Insufficient data for train/test split"}
+
+    # Train ML model
+    ml = MLStrategy(forward_days=15, threshold_pct=2.0)
+    train_result = ml.train(train_df)
+    if "error" in train_result:
+        return train_result
+
+    # Initialize RL position sizer
+    rl = RLPositionSizer()
+
+    # Run backtest on test data
+    trades = []
+    equity_curve = []
+    capital = starting_capital
+    open_positions = []
+    iv = estimate_iv(df)
+
+    for i in range(50, len(test_df)):
+        current_date = test_df.index[i]
+        current_price = float(test_df["Close"].iloc[i])
+
+        # Close expired positions
+        still_open = []
+        for pos in open_positions:
+            if current_date >= pos["expiry_date"]:
+                exit_price = current_price
+                if pos["type"] == "BUY_CALL":
+                    option_exit = black_scholes_call(
+                        exit_price, pos["strike"], 0.001, sigma=iv
+                    )
+                else:
+                    option_exit = black_scholes_put(
+                        exit_price, pos["strike"], 0.001, sigma=iv
+                    )
+                pnl = (option_exit - pos["entry_premium"]) * pos["contracts"] * 100
+                capital += pnl + pos["cost"]
+                pos["exit_date"] = current_date
+                pos["exit_price"] = exit_price
+                pos["exit_premium"] = option_exit
+                pos["pnl"] = pnl
+                pos["holding_days"] = (current_date - pos["entry_date"]).days
+                trades.append(pos)
+            else:
+                still_open.append(pos)
+        open_positions = still_open
+
+        # Get ML prediction using lookback window
+        lookback_start = max(0, i - 60)
+        lookback_df = test_df.iloc[lookback_start:i + 1].copy()
+        if len(lookback_df) < 50:
+            equity_curve.append({"date": current_date, "equity": capital})
+            continue
+
+        signal = ml.predict(lookback_df)
+        regime = ml.get_regime(lookback_df)
+
+        if signal["signal"] == "NO_TRADE" or signal["confidence"] < min_confidence:
+            equity_curve.append({"date": current_date, "equity": capital})
+            continue
+
+        # RL position sizing
+        from modules.ml_strategy import compute_features
+        features = compute_features(lookback_df)
+        rsi_val = float(features["rsi_14"].iloc[-1]) if "rsi_14" in features and not pd.isna(features["rsi_14"].iloc[-1]) else 50
+        exposure_pct = sum(p["cost"] for p in open_positions) / capital * 100 if capital > 0 else 0
+
+        state = TradingState.get_state(
+            regime, iv, signal["confidence"], exposure_pct, rsi_val
+        )
+        rl_decision = rl.get_position_size(state)
+        actual_size_pct = rl_decision["size_pct"] if rl_decision["size_pct"] > 0 else position_size_pct
+
+        # Calculate position
+        max_cost = capital * (actual_size_pct / 100)
+        if max_cost <= 0:
+            equity_curve.append({"date": current_date, "equity": capital})
+            continue
+
+        T = option_expiry_weeks / 52
+        strike = current_price  # ATM options
+
+        if signal["signal"] == "BUY_CALL":
+            premium = black_scholes_call(current_price, strike, T, sigma=iv)
+        else:
+            premium = black_scholes_put(current_price, strike, T, sigma=iv)
+
+        if premium <= 0.01:
+            equity_curve.append({"date": current_date, "equity": capital})
+            continue
+
+        contracts = max(1, int(max_cost / (premium * 100)))
+        cost = contracts * premium * 100
+        if cost > capital:
+            equity_curve.append({"date": current_date, "equity": capital})
+            continue
+
+        capital -= cost
+        expiry_date = current_date + timedelta(weeks=option_expiry_weeks)
+
+        open_positions.append({
+            "symbol": symbol,
+            "type": signal["signal"],
+            "entry_date": current_date,
+            "entry_price": current_price,
+            "strike": strike,
+            "entry_premium": premium,
+            "contracts": contracts,
+            "cost": cost,
+            "expiry_date": expiry_date,
+            "confluence": signal["confidence"],
+            "ml_confidence": signal["confidence"],
+            "regime": regime,
+            "rl_action": rl_decision["action_name"],
+        })
+
+        equity_curve.append({"date": current_date, "equity": capital})
+
+    # Force-close remaining positions
+    final_price = float(test_df["Close"].iloc[-1])
+    for pos in open_positions:
+        if pos["type"] == "BUY_CALL":
+            option_exit = black_scholes_call(final_price, pos["strike"], 0.001, sigma=iv)
+        else:
+            option_exit = black_scholes_put(final_price, pos["strike"], 0.001, sigma=iv)
+        pnl = (option_exit - pos["entry_premium"]) * pos["contracts"] * 100
+        capital += pnl + pos["cost"]
+        pos["exit_date"] = test_df.index[-1]
+        pos["exit_price"] = final_price
+        pos["exit_premium"] = option_exit
+        pos["pnl"] = pnl
+        pos["holding_days"] = (test_df.index[-1] - pos["entry_date"]).days
+        trades.append(pos)
+
+    # Train RL on results for future use
+    if trades:
+        rl.train_on_backtest(trades, starting_capital)
+
+    metrics = calculate_metrics(trades, starting_capital, equity_curve)
+    equity_df = pd.DataFrame(equity_curve)
+
+    return {
+        "trades": trades,
+        "metrics": metrics,
+        "equity_curve": equity_df,
+        "symbol": symbol,
+        "strategy": "ML_GBT",
+        "ml_training": train_result,
+        "rl_summary": rl.get_training_summary(),
+        "parameters": {
+            "min_confidence": min_confidence,
+            "option_expiry_weeks": option_expiry_weeks,
+            "starting_capital": starting_capital,
+            "position_size_pct": position_size_pct,
+            "train_ratio": train_ratio,
+        },
+    }
