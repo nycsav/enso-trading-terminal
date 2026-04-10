@@ -218,13 +218,13 @@ PAPER_BG = "#1a1a2e"
      State("bt-proximity", "value"),
      State("bt-expiry", "value"),
      State("bt-capital", "value"),
-     State("bt-position-size", "value",)
+     State("bt-position-size", "value"),
          State("bt-strategy", "value"),],
     prevent_initial_call=True,
 )
 def run_backtest_callback(n_clicks, symbols, start_date, end_date,
-                          proximity, expiry, capital, position_size)
-                         strategy,:
+                          proximity, expiry, capital, position_size,
+                                                  strategy):
     """Run backtest and update all charts."""
     if not symbols:
         empty = go.Figure()
