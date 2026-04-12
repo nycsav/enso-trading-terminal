@@ -20,6 +20,14 @@ DEFAULT_POSITION_SIZE_PCT = 5  # % of capital per trade
 DEFAULT_OPTION_EXPIRY_WEEKS = 3
 WALK_FORWARD_TRAIN_RATIO = 0.70  # 70/30 split
 
+# Risk management defaults
+STOP_LOSS_PCT = 50  # Cut position at -50% of premium paid
+TAKE_PROFIT_PCT = 100  # Take profit at +100% of premium paid
+MAX_EXPOSURE_PCT = 25  # Never have more than 25% of capital at risk
+OTM_OFFSET_PCT = 2.0  # Use strikes 2% OTM for better risk/reward
+IV_RANK_MAX = 50  # Only buy options when IV percentile < 50 (cheaper premiums)
+IV_LOOKBACK_WINDOW = 60  # Days to compute IV rank
+
 # Confluence scoring weights
 CONFLUENCE_WEIGHTS = {
     "proximity": 0.30,
