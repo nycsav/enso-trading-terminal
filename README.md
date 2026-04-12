@@ -231,13 +231,19 @@ enso-trading-terminal/
 │   ├── api_client.py           # Public.com API client
 │   ├── research.py             # Market data fetching & technical indicators
 │   └── scheduled_tasks.py      # Background signal monitoring
-└── pages/
-    ├── __init__.py
-    └── backtest.py             # Backtest dashboard page
-                                #   - Interactive parameter controls
-                                #   - 7 Plotly charts
-                                #   - WFO results panel
-                                #   - CSV export
+├── pages/
+│   ├── __init__.py
+│   └── backtest.py             # Backtest dashboard page
+│                               #   - Interactive parameter controls
+│                               #   - 7 Plotly charts
+│                               #   - WFO results panel
+│                               #   - CSV export
+└── strategies/
+    ├── strategy-testing-guide.md    # Plain-English strategy tutorial
+    ├── backtest-specs.md            # Technical backtest specifications
+    ├── strategy-rankings.json       # Structured strategy data
+    ├── strategy-rankings.csv        # Strategy rankings (CSV)
+    └── enso-options-strategy-map.html  # Interactive strategy dashboard
 ```
 
 ### Core Components
@@ -249,6 +255,37 @@ enso-trading-terminal/
 | **`modules/backtester.py`** | Full backtesting loop with Black-Scholes option pricing, position management, 13+ metrics calculation, walk-forward optimization with grid search, overfit detection |
 | **`pages/backtest.py`** | Interactive backtest UI: symbol multi-select, date pickers, parameter sliders, 7 Plotly charts (equity, price+S/R, win rate, P&L histogram, monthly, drawdown, confluence), WFO panel, CSV export |
 | **`config.py`** | Centralized configuration: API keys, default symbols, S/R parameters, confluence weights, backtest defaults |
+
+---
+
+## Institutional Options Strategies
+
+The `strategies/` directory contains a complete institutional-grade options strategy research workspace:
+
+| File | Description |
+|------|-------------|
+| **[strategy-testing-guide.md](strategies/strategy-testing-guide.md)** | Plain-English tutorial: how to test and use all 10 strategies, step-by-step |
+| **[backtest-specs.md](strategies/backtest-specs.md)** | Technical backtest specifications for each strategy (developer-ready) |
+| **[strategy-rankings.json](strategies/strategy-rankings.json)** | Structured data: rankings, scoring, data sources, build phases |
+| **[strategy-rankings.csv](strategies/strategy-rankings.csv)** | Same rankings in CSV format for quick reference |
+| **[enso-options-strategy-map.html](strategies/enso-options-strategy-map.html)** | Interactive dashboard: strategy rankings, phase timeline, AI use cases |
+
+### The 10 Strategies (by priority)
+
+| # | Strategy | Edge | Difficulty | Phase |
+|---|----------|------|------------|-------|
+| 1 | IV vs RV Gap Monitor | 9.2 | Medium | Phase 1 |
+| 2 | Dealer Gamma Regime | 9.0 | High | Phase 2 |
+| 3 | Skew Surface Trading | 8.8 | Expert | Phase 3 |
+| 4 | Dispersion / Correlation | 8.5 | Expert | Phase 4 |
+| 5 | Event Vol Strangle | 8.2 | Medium | Phase 1 |
+| 6 | Term Structure Carry | 7.8 | Medium | Phase 2 |
+| 7 | Pinning / 0DTE Dynamics | 7.5 | High | Phase 2 |
+| 8 | Vol Risk Premium Harvest | 7.2 | Medium | Phase 1 |
+| 9 | Cross-Asset Signal Fusion | 6.8 | High | Phase 3 |
+| 10 | S/R + Vol Filter Overlay | 6.2 | Low | Baseline |
+
+Start with the **[Strategy Testing Guide](strategies/strategy-testing-guide.md)** for the plain-English walkthrough.
 
 ---
 
