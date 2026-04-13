@@ -20,6 +20,9 @@ Built with Python, Dash/Plotly, and Black-Scholes option pricing. Connects to yo
 - **Walk-forward optimization** — 70/30 train/test split with overfit detection (ROBUST / MODERATE / OVERFIT ratings)
 - **Multi-symbol portfolio analysis** — Run backtests across any combination of AMD, QQQ, SPY, META, TSLA, NVDA, AMZN, GOOGL, MSFT, AAPL
 - **7 interactive Plotly charts** — Equity curve, price + S/R overlay, win rate by symbol, P&L histogram, monthly P&L, drawdown, confluence scatter
+- **Perplexity automation** — Scheduled cron jobs for portfolio briefings, expiration alerts, covered call scanning, and dip protection
+- **Research-to-trade pipeline** — Natural language research → live options chain → strategy recommendation → preflight → execution
+- **Options rebate tracking** — Monitor monthly contract volume and rebate tier status ($0.06–$0.10/contract)
 
 ---
 
@@ -206,6 +209,23 @@ This repo includes a `render.yaml` blueprint file for one-click deployment:
 
 ---
 
+## Perplexity Automation (Stocks & Options)
+
+The terminal integrates with [Perplexity Computer](https://public.com/api/docs/templates/perplexity-agent-skill) via the Public.com Agent Skill for automated workflows. These require no code changes — just paste the prompt into Perplexity.
+
+| Capability | Schedule | What It Does |
+|------------|----------|--------------|
+| **Morning Briefing** | Weekdays 9:30 AM ET | Portfolio summary, overnight moves, expiring options |
+| **Expiration Alert** | Weekdays 3:45 PM ET | Flags options expiring within 3 days with action recommendations |
+| **Covered Call Scanner** | Mondays 9:00 AM ET | Scans holdings for covered call opportunities by premium yield |
+| **Dip Alert** | Weekdays 3:00 PM ET | Alerts when watchlist stocks drop 5%+ with protective put suggestions |
+| **Research Pipeline** | On demand | Research → options chain → strategy → preflight → trade (one conversation) |
+| **Rebate Tracker** | On demand | Monthly contract volume, current rebate tier, earnings summary |
+
+See **[docs/capability-instructions.md](docs/capability-instructions.md)** for the exact prompts.
+
+---
+
 ## Architecture
 
 ```
@@ -215,29 +235,31 @@ enso-trading-terminal/
 ├── requirements.txt            # Python dependencies
 ├── Procfile                    # Render/Heroku deployment
 ├── render.yaml                 # Render blueprint for one-click deploy
+├── CHANGELOG.md                # Version history
+├── assets/
+│   └── custom.css              # Dark theme CSS overrides
 ├── modules/
 │   ├── __init__.py
+│   ├── api_client.py           # Public.com SDK wrapper (525 lines)
 │   ├── sr_engine.py            # S/R calculation engine
-│   │                           #   - 20-day pivot lookback
-│   │                           #   - Level clustering (0.5% threshold)
-│   │                           #   - 4-factor confluence scoring
-│   │                           #   - Signal generation (BUY_CALL / BUY_PUT)
 │   ├── backtester.py           # Walk-forward backtesting engine
-│   │                           #   - Black-Scholes call/put pricing
-│   │                           #   - Historical IV estimation
-│   │                           #   - 13+ performance metrics
-│   │                           #   - Walk-forward optimization
-│   │                           #   - Overfit detection (ROBUST/MODERATE/OVERFIT)
-│   ├── api_client.py           # Public.com API client
+│   ├── strategy_engines.py     # 6 extended backtesting strategies (1,057 lines)
+│   ├── ml_strategy.py          # ML Gradient Boosted Trees strategy
+│   ├── rl_agent.py             # Reinforcement learning agent
+│   ├── llm_signals.py          # LLM-based signal generation
 │   ├── research.py             # Market data fetching & technical indicators
 │   └── scheduled_tasks.py      # Background signal monitoring
 ├── pages/
 │   ├── __init__.py
-│   └── backtest.py             # Backtest dashboard page
-│                               #   - Interactive parameter controls
-│                               #   - 7 Plotly charts
-│                               #   - WFO results panel
-│                               #   - CSV export
+│   ├── dashboard.py            # Market overview with S/R signals
+│   ├── portfolio.py            # Live brokerage portfolio view
+│   ├── backtest.py             # 8-strategy backtesting engine with 7 charts
+│   ├── options.py              # Live options chain viewer with Greeks
+│   └── orders.py               # Order management (preflight + placement)
+├── docs/
+│   ├── capability-instructions.md  # Phase 1 automation prompts & instructions
+│   ├── api-opportunities-analysis.md # Untapped API opportunities analysis
+│   └── user-guide.pdf          # Full user guide (PDF)
 └── strategies/
     ├── strategy-testing-guide.md    # Plain-English strategy tutorial
     ├── backtest-specs.md            # Technical backtest specifications
