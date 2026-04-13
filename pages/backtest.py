@@ -16,6 +16,10 @@ import io
 from datetime import datetime, timedelta
 
 from modules.backtester import run_backtest, walk_forward_optimization, run_ml_backtest
+from modules.strategy_engines import (
+    run_iv_rv_backtest, run_event_vol_backtest, run_vrp_backtest,
+    run_sr_vol_backtest, run_term_carry_backtest, run_cross_asset_backtest,
+)
 from modules.research import fetch_market_data
 from modules.sr_engine import find_pivots
 from config import SYMBOLS, DEFAULT_CAPITAL, DEFAULT_OPTION_EXPIRY_WEEKS
@@ -111,10 +115,16 @@ layout = html.Div([
                 options=[
                     {"label": "S/R Mean Reversion", "value": "sr"},
                     {"label": "ML Gradient Boosted Trees", "value": "ml"},
+                    {"label": "IV vs RV Gap Monitor", "value": "iv_rv"},
+                    {"label": "Event Vol Strangle", "value": "event_vol"},
+                    {"label": "Vol Risk Premium Harvest", "value": "vrp"},
+                    {"label": "S/R + Vol Filter Overlay", "value": "sr_vol"},
+                    {"label": "Term Structure Carry", "value": "term_carry"},
+                    {"label": "Cross-Asset Momentum", "value": "cross_asset"},
                 ],
                 value="sr",
                 clearable=False,
-                style={"width": "220px", "marginRight": "10px", "display": "inline-block",
+                style={"width": "280px", "marginRight": "10px", "display": "inline-block",
                        "verticalAlign": "middle"},
             ),
         html.Button("Run Backtest", id="bt-run-btn", n_clicks=0,
@@ -246,6 +256,49 @@ def run_backtest_callback(n_clicks, symbols, start_date, end_date,
 
         if strategy == "ml":
             result = run_ml_backtest(
+                df, symbol=symbol,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
+        elif strategy == "iv_rv":
+            result = run_iv_rv_backtest(
+                df, symbol=symbol,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
+        elif strategy == "event_vol":
+            result = run_event_vol_backtest(
+                df, symbol=symbol,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
+        elif strategy == "vrp":
+            result = run_vrp_backtest(
+                df, symbol=symbol,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
+        elif strategy == "sr_vol":
+            result = run_sr_vol_backtest(
+                df, symbol=symbol,
+                proximity_threshold_pct=proximity,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
+        elif strategy == "term_carry":
+            result = run_term_carry_backtest(
+                df, symbol=symbol,
+                option_expiry_weeks=expiry,
+                starting_capital=capital,
+                position_size_pct=position_size,
+            )
+        elif strategy == "cross_asset":
+            result = run_cross_asset_backtest(
                 df, symbol=symbol,
                 option_expiry_weeks=expiry,
                 starting_capital=capital,
