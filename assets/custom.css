@@ -1,0 +1,252 @@
+/* ── Enso Trading Terminal — Dark Theme Overrides ─────────────────────────── */
+
+/* Global text color */
+body {
+    color: #eee;
+}
+
+/* ── Dropdowns ────────────────────────────────────────────────────────────── */
+/* Dropdown container */
+.Select-control,
+.Select-menu-outer,
+.Select--single > .Select-control .Select-value,
+.Select-value-label,
+.Select-placeholder,
+.dash-dropdown .Select-control,
+.dash-dropdown .Select-value-label,
+.dash-dropdown .Select-placeholder {
+    color: #eee !important;
+    background-color: #16213e !important;
+    border-color: #333 !important;
+}
+
+/* Dash dropdown - the actual visible component */
+.Select input {
+    color: #eee !important;
+}
+
+.Select-menu {
+    background-color: #16213e !important;
+}
+
+.Select-option {
+    color: #eee !important;
+    background-color: #16213e !important;
+}
+
+.Select-option:hover,
+.Select-option.is-focused {
+    background-color: #1a3a5c !important;
+}
+
+.Select-option.is-selected {
+    background-color: #2196F3 !important;
+}
+
+/* VirtualizedSelectOption */
+.VirtualizedSelectOption {
+    color: #eee !important;
+    background-color: #16213e !important;
+}
+
+.VirtualizedSelectOption:hover {
+    background-color: #1a3a5c !important;
+}
+
+/* Multi-value tags */
+.Select-value {
+    background-color: #2a3f5f !important;
+    border-color: #444 !important;
+    color: #eee !important;
+}
+
+.Select-value-icon:hover {
+    background-color: #f44336 !important;
+    color: white !important;
+}
+
+.Select-arrow {
+    border-color: #888 transparent transparent !important;
+}
+
+.Select.is-open > .Select-control .Select-arrow {
+    border-color: transparent transparent #888 !important;
+}
+
+/* Clear (X) button */
+.Select-clear {
+    color: #888 !important;
+}
+
+.Select-clear:hover {
+    color: #eee !important;
+}
+
+/* ── Input fields ─────────────────────────────────────────────────────────── */
+input[type="number"],
+input[type="text"],
+.dash-input {
+    color: #eee !important;
+    background-color: #16213e !important;
+    border: 1px solid #333 !important;
+    border-radius: 4px;
+}
+
+input[type="number"]:focus,
+input[type="text"]:focus {
+    border-color: #2196F3 !important;
+    outline: none;
+}
+
+/* Number input +/- buttons */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    filter: invert(1);
+}
+
+/* ── Date Pickers ─────────────────────────────────────────────────────────── */
+.DateInput_input {
+    color: #eee !important;
+    background-color: #16213e !important;
+    border-bottom: 2px solid #333 !important;
+    font-size: 13px !important;
+}
+
+.DateInput_input__focused {
+    border-bottom: 2px solid #2196F3 !important;
+}
+
+.DateInput {
+    background-color: #16213e !important;
+}
+
+.SingleDatePickerInput {
+    background-color: #16213e !important;
+    border: 1px solid #333 !important;
+    border-radius: 4px;
+}
+
+.SingleDatePickerInput__withBorder {
+    border-color: #333 !important;
+}
+
+/* Calendar popup */
+.DayPicker {
+    background: #1a1a2e !important;
+}
+
+.CalendarMonth {
+    background: #1a1a2e !important;
+}
+
+.CalendarMonth_caption {
+    color: #eee !important;
+}
+
+.CalendarDay__default {
+    color: #eee !important;
+    background: #16213e !important;
+    border: 1px solid #333 !important;
+}
+
+.CalendarDay__default:hover {
+    background: #2196F3 !important;
+    color: white !important;
+}
+
+.CalendarDay__selected {
+    background: #4CAF50 !important;
+    color: white !important;
+}
+
+.CalendarDay__blocked_out_of_range {
+    color: #555 !important;
+}
+
+.DayPickerNavigation_button__default {
+    background-color: #16213e !important;
+    border: 1px solid #333 !important;
+}
+
+.DayPickerNavigation_svg__horizontal {
+    fill: #eee !important;
+}
+
+.DayPicker_weekHeader_li small {
+    color: #888 !important;
+}
+
+/* ── Slider ───────────────────────────────────────────────────────────────── */
+.rc-slider-mark-text {
+    color: #aaa !important;
+    font-size: 11px !important;
+}
+
+.rc-slider-tooltip-inner {
+    background-color: #2196F3 !important;
+    color: white !important;
+}
+
+.rc-slider-track {
+    background-color: #2196F3 !important;
+}
+
+.rc-slider-handle {
+    border-color: #2196F3 !important;
+    background-color: #2196F3 !important;
+}
+
+.rc-slider-rail {
+    background-color: #333 !important;
+}
+
+.rc-slider-dot {
+    border-color: #333 !important;
+    background-color: #333 !important;
+}
+
+.rc-slider-dot-active {
+    border-color: #2196F3 !important;
+}
+
+/* ── Labels ───────────────────────────────────────────────────────────────── */
+label {
+    color: #ccc !important;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* ── Numeric Input (Dash dcc.Input with +/- buttons) ──────────────────────── */
+.dash-input-group {
+    background-color: #16213e !important;
+}
+
+/* ── DataTable ────────────────────────────────────────────────────────────── */
+.dash-spreadsheet-container .dash-spreadsheet-inner th,
+.dash-spreadsheet-container .dash-spreadsheet-inner td {
+    color: #eee !important;
+    background-color: #16213e !important;
+    border-color: #333 !important;
+}
+
+.dash-spreadsheet-container .dash-spreadsheet-inner th {
+    background-color: #1a1a2e !important;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.tab--selected {
+    color: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+}
+
+/* ── Loading spinner color ────────────────────────────────────────────────── */
+._dash-loading-callback {
+    color: #2196F3 !important;
+}
+
+/* ── Page background ──────────────────────────────────────────────────────── */
+._dash-undo-redo {
+    display: none;
+}
