@@ -1,34 +1,42 @@
 """
 Enso Trading Terminal - Configuration
+Reads API credentials from environment variables or .env file.
 """
 import os
 
-# Public.com API
-PUBLIC_API_KEY = os.environ.get("PUBLIC_API_KEY", "")
-PUBLIC_API_BASE = "https://api.public.com/v1"
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
+# ---------------------------------------------------------------------------
+# Public.com API (via publicdotcom-py SDK)
+# ---------------------------------------------------------------------------
+PUBLIC_COM_SECRET = os.environ.get("PUBLIC_COM_SECRET", "")
+PUBLIC_COM_ACCOUNT_ID = os.environ.get("PUBLIC_COM_ACCOUNT_ID", "5LF05438")
+
+# All known accounts
+ACCOUNTS = {
+    "brokerage": "5LF05438",
+    "bond": "3CT06086",
+    "high_yield": "5OT26212",
+}
+
+# ---------------------------------------------------------------------------
 # Default symbols for analysis
+# ---------------------------------------------------------------------------
 SYMBOLS = ["AMD", "QQQ", "SPY", "META", "TSLA", "NVDA", "AMZN", "GOOGL", "MSFT", "AAPL"]
 
+# ---------------------------------------------------------------------------
 # S/R Engine defaults
+# ---------------------------------------------------------------------------
 SR_LOOKBACK_DAYS = 20
-PROXIMITY_THRESHOLD_PCT = 1.5  # Default proximity threshold (%)
+PROXIMITY_THRESHOLD_PCT = 1.5
 
-# Backtester defaults
-DEFAULT_CAPITAL = 10000
-DEFAULT_POSITION_SIZE_PCT = 5  # % of capital per trade
-DEFAULT_OPTION_EXPIRY_WEEKS = 3
-WALK_FORWARD_TRAIN_RATIO = 0.70  # 70/30 split
-
-# Risk management defaults
-STOP_LOSS_PCT = 50  # Cut position at -50% of premium paid
-TAKE_PROFIT_PCT = 100  # Take profit at +100% of premium paid
-MAX_EXPOSURE_PCT = 25  # Never have more than 25% of capital at risk
-OTM_OFFSET_PCT = 2.0  # Use strikes 2% OTM for better risk/reward
-IV_RANK_MAX = 50  # Only buy options when IV percentile < 50 (cheaper premiums)
-IV_LOOKBACK_WINDOW = 60  # Days to compute IV rank
-
+# ---------------------------------------------------------------------------
 # Confluence scoring weights
+# ---------------------------------------------------------------------------
 CONFLUENCE_WEIGHTS = {
     "proximity": 0.30,
     "volume": 0.25,
@@ -36,23 +44,85 @@ CONFLUENCE_WEIGHTS = {
     "retest": 0.20,
 }
 
-# Dashboard
-DASH_HOST = "0.0.0.0"
-DASH_PORT = int(os.environ.get("PORT", 8050))
-DASH_DEBUG = os.environ.get("DASH_DEBUG", "false").lower() == "true"
+# ---------------------------------------------------------------------------
+# Backtester defaults
+# ---------------------------------------------------------------------------
+DEFAULT_CAPITAL = 10000
+DEFAULT_POSITION_SIZE_PCT = 5
+DEFAULT_OPTION_EXPIRY_WEEKS = 3
+WALK_FORWARD_TRAIN_RATIO = 0.70
 
+# Risk management defaults
+STOP_LOSS_PCT = 50
+TAKE_PROFIT_PCT = 100
+MAX_EXPOSURE_PCT = 25
+OTM_OFFSET_PCT = 2.0
+IV_RANK_MAX = 50
+IV_LOOKBACK_WINDOW = 60
+
+# ---------------------------------------------------------------------------
 # ML Strategy defaults
-ML_FORWARD_DAYS = 15  # Prediction horizon
-ML_THRESHOLD_PCT = 2.0  # Min move to trigger signal
-ML_MIN_CONFIDENCE = 55.0  # Min model confidence to trade
+# ---------------------------------------------------------------------------
+ML_FORWARD_DAYS = 15
+ML_THRESHOLD_PCT = 2.0
+ML_MIN_CONFIDENCE = 55.0
 ML_N_ESTIMATORS = 200
 ML_MAX_DEPTH = 4
 ML_LEARNING_RATE = 0.05
 
+# ---------------------------------------------------------------------------
 # RL Agent defaults
-RL_ALPHA = 0.1  # Learning rate
-RL_GAMMA = 0.95  # Discount factor
-RL_EPSILON = 0.15  # Exploration rate
+# ---------------------------------------------------------------------------
+RL_ALPHA = 0.1
+RL_GAMMA = 0.95
+RL_EPSILON = 0.15
 
+# ---------------------------------------------------------------------------
+# Dashboard settings
+# ---------------------------------------------------------------------------
+DASH_HOST = "0.0.0.0"
+DASH_PORT = int(os.environ.get("PORT", 8050))
+DASH_DEBUG = os.environ.get("DASH_DEBUG", "false").lower() == "true"
+REFRESH_INTERVAL_MS = 30_000  # 30 seconds
+SR_PROXIMITY_PCT = 1.5
+OPTIONS_WEEKS_OUT = (2, 4)
+MARKET_OPEN_HOUR = 9  # ET
+MARKET_OPEN_MIN = 30
+MARKET_CLOSE_HOUR = 16
+MARKET_CLOSE_MIN = 0
+
+# ---------------------------------------------------------------------------
+# Theme colors (dark terminal aesthetic)
+# ---------------------------------------------------------------------------
+COLORS = {
+    "bg": "#0d1117",
+    "surface": "#161b22",
+    "surface_alt": "#1c2333",
+    "border": "#30363d",
+    "text": "#e6edf3",
+    "text_muted": "#8b949e",
+    "text_faint": "#484f58",
+    "green": "#3fb950",
+    "red": "#f85149",
+    "blue": "#58a6ff",
+    "yellow": "#d29922",
+    "purple": "#bc8cff",
+    "orange": "#ffa657",
+}
+
+# ---------------------------------------------------------------------------
 # LLM / Perplexity API
+# ---------------------------------------------------------------------------
 PPLX_API_KEY = os.environ.get("PPLX_API_KEY", "")
+
+
+# ---------------------------------------------------------------------------
+# Validate on import
+# ---------------------------------------------------------------------------
+def validate_config():
+    warnings = []
+    if not PUBLIC_COM_SECRET:
+        warnings.append("PUBLIC_COM_SECRET not set - live brokerage data disabled. Set via env var or .env file.")
+    if not PPLX_API_KEY:
+        warnings.append("PPLX_API_KEY not set - AI research panel will use demo data.")
+    return warnings

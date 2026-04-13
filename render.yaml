@@ -3,12 +3,13 @@ services:
     name: enso-trading-terminal
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:server --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:server --bind 0.0.0.0:$PORT --timeout 120
     envVars:
-      - key: PUBLIC_API_KEY
+      - key: PUBLIC_COM_SECRET
+        sync: false
+      - key: PUBLIC_COM_ACCOUNT_ID
+        value: 5LF05438
+      - key: PPLX_API_KEY
         sync: false
       - key: PYTHON_VERSION
-        value: "3.11"
-      - key: DASH_DEBUG
-        value: "false"
-    plan: free
+        value: "3.12"
