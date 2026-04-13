@@ -24,6 +24,17 @@ from modules.research import fetch_market_data
 from modules.sr_engine import find_pivots
 from config import SYMBOLS, DEFAULT_CAPITAL, DEFAULT_OPTION_EXPIRY_WEEKS
 
+# Popular symbols as defaults; users can type any ticker
+DEFAULT_SYMBOLS = sorted(set(SYMBOLS + [
+    "AAPL", "AMZN", "AMD", "BABA", "BAC", "C", "CRM", "DIS", "F", "GOOG",
+    "GOOGL", "GS", "HD", "INTC", "JNJ", "JPM", "KO", "LLY", "MA", "META",
+    "MRK", "MSFT", "NFLX", "NKE", "NVDA", "PEP", "PFE", "PLTR", "PYPL",
+    "QQQ", "ROKU", "SHOP", "SNAP", "SOFI", "SPY", "SQ", "TGT", "TSLA",
+    "UNH", "V", "WMT", "XOM", "IWM", "DIA", "GLD", "TLT", "ARKK",
+    "COIN", "RIVN", "LCID", "NIO", "ABNB", "UBER", "LYFT", "RBLX",
+    "U", "SNOW", "DDOG", "NET", "CRWD", "ZS", "MDB", "PANW",
+]))
+
 dash.register_page(__name__, path="/backtest", name="Backtest", icon="fa-chart-line")
 
 
@@ -40,10 +51,11 @@ layout = html.Div([
             html.Label("Symbols"),
             dcc.Dropdown(
                 id="bt-symbols",
-                options=[{"label": s, "value": s} for s in SYMBOLS],
+                options=[{"label": s, "value": s} for s in DEFAULT_SYMBOLS],
                 value=["NVDA"],
                 multi=True,
-                placeholder="Select symbols...",
+                placeholder="Type or select any ticker...",
+                searchable=True,
             ),
         ], className="control-group", style={"flex": "2"}),
 
