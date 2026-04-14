@@ -114,7 +114,7 @@ class FlashAlphaSource:
         """Check if an API key is available."""
         return bool(self.api_key)
 
-    def get_gex(self, symbol: str, expiration: Optional[str] = None) -> dict:
+    def get_gex(self, symbol: str, expiration: Optional[str] = None, auto_expiry: bool = True) -> dict:
         """
         Fetch gamma exposure (GEX) data for a symbol.
 
@@ -122,6 +122,8 @@ class FlashAlphaSource:
             symbol:     Ticker symbol (e.g., "SPY", "AAPL", "NVDA")
             expiration: Optional expiry filter (YYYY-MM-DD). Required on
                         free tier — full-chain GEX needs Growth plan.
+            auto_expiry: If True and no expiration given, automatically uses
+                         the nearest Friday as expiry (free tier workaround).
 
         Returns:
             {
@@ -163,8 +165,28 @@ class FlashAlphaSource:
             params = {}
             if expiration:
                 params["expiration"] = expiration
+            elif auto_expiry:
+                # Free tier requires a single expiry filter.
+                # Auto-select nearest Friday (most liquid weekly expiry).
+                today = datetime.date.today()
+                days_ahead = 4 - today.weekday()  # Friday = 4
+                if days_ahead <= 0:
+                    days_ahead += 7
+                nearest_friday = today + datetime.timedelta(days=days_ahead)
+                params["expiration"] = nearest_friday.strftime("%Y-%m-%d")
+                logger.info(
+                    f"FlashAlpha: auto-selecting expiry {params['expiration']} "
+                    f"for free tier (use expiration= to override)"
+                )
 
             resp = requests.get(url, headers=self._headers, params=params, timeout=15)
+
+            # If 403 with auto-expiry, try without (in case user has paid plan)
+            if resp.status_code == 403 and auto_expiry and not expiration:
+                logger.info("FlashAlpha: 403 with auto-expiry, retrying without filter...")
+                resp = requests.get(
+                    url, headers=self._headers, timeout=15
+                )
 
             if resp.status_code == 403:
                 result["error"] = (
