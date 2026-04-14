@@ -10,3 +10,5 @@ gunicorn>=21.2.0
 scikit-learn>=1.3.0
 publicdotcom-py>=0.1.8
 python-dotenv>=1.0.0
+finvizfinance>=1.0.0
+flashalpha>=0.1.0

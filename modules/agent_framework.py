@@ -55,6 +55,7 @@ import pandas as pd
 import yfinance as yf
 
 from modules.strategy_map import STRATEGY_MAP, get_strategy
+from modules.market_data_sources import FlashAlphaSource, FinvizVolumeScanner
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -466,16 +467,24 @@ class TechnicalAgent:
 
 class VolatilityAgent:
     """
-    Analyzes historical price volatility to determine the current vol regime.
+    Analyzes volatility to determine the current vol regime.
 
-    In an ideal world, we'd pull Implied Volatility directly from the options
-    chain. But since we can't hit a live options feed here, we use historical
-    volatility as a proxy and compare it to its own rolling percentile.
+    TWO DATA SOURCES (layered):
 
-    Indicators computed:
-        hist_vol_20d    — 20-day annualized historical volatility
-        hist_vol_60d    — 60-day annualized historical volatility (baseline)
-        vol_percentile  — Where current vol sits vs the past year (0–100)
+    1. Historical Volatility (always available)
+       - HV_20, HV_60, vol_percentile vs trailing year
+       - Computed from yfinance price data
+
+    2. FlashAlpha GEX / Gamma Exposure (when API key configured)
+       - Real-time dealer positioning: positive or negative gamma regime
+       - Gamma flip level, call wall, put wall
+       - Tells us whether dealers will DAMPEN or AMPLIFY price moves
+       - This is the signal professional options desks use
+
+    When FlashAlpha is available, GEX data UPGRADES the analysis:
+       - Negative gamma + HIGH_VOL → "EXTREME" (moves will be amplified)
+       - Positive gamma + HIGH_VOL → "HIGH_VOL" (dampened, premium selling sweet spot)
+       - Negative gamma overrides NORMAL → bumps to HIGH_VOL (wider strikes needed)
 
     Vol Regime classification:
         LOW_VOL    → vol_percentile < 25   (options are cheap — buy premium)
@@ -489,6 +498,17 @@ class VolatilityAgent:
         NORMAL             → Directional plays based on technical signal
     """
 
+    def __init__(self, flashalpha_source: Optional[FlashAlphaSource] = None):
+        """
+        Initialize with optional FlashAlpha GEX data source.
+
+        Args:
+            flashalpha_source: FlashAlphaSource instance. If provided and
+                               configured, GEX data upgrades the vol analysis.
+                               If None, falls back to historical vol only.
+        """
+        self._flashalpha = flashalpha_source
+
     @staticmethod
     def _annualized_vol(returns: pd.Series) -> float:
         """Convert a returns series to annualized volatility (percent)."""
@@ -499,6 +519,9 @@ class VolatilityAgent:
     def analyze(self, symbol: str, current_price: float) -> dict:
         """
         Fetch historical prices and compute the volatility regime.
+
+        If FlashAlpha is configured, also fetches GEX data to refine the
+        regime classification with real dealer positioning data.
 
         Args:
             symbol:        Ticker symbol, e.g. "NVDA"
@@ -513,6 +536,7 @@ class VolatilityAgent:
                 "vol_regime":      str    — "LOW_VOL" | "NORMAL" | "HIGH_VOL" | "EXTREME"
                 "regime_note":     str    — one-line plain English interpretation
                 "strategy_hint":   str    — suggested approach for this regime
+                "gex_data":        dict|None — FlashAlpha GEX data (if available)
                 "error":           str | None
             }
         """
@@ -524,6 +548,7 @@ class VolatilityAgent:
             "vol_regime": "NORMAL",
             "regime_note": "Unable to compute — default to NORMAL",
             "strategy_hint": "Directional plays based on technical signal",
+            "gex_data": None,
             "error": None,
         }
 
@@ -581,6 +606,76 @@ class VolatilityAgent:
 
         except Exception as e:
             result["error"] = str(e)
+
+        # ── FlashAlpha GEX overlay (if configured) ────────────────────
+        #
+        # When GEX data is available, it refines the regime classification:
+        #   - Negative gamma + NORMAL  → bump to HIGH_VOL (amplified moves)
+        #   - Negative gamma + HIGH_VOL → bump to EXTREME
+        #   - Positive gamma + EXTREME  → keep as HIGH_VOL (dampened)
+        #
+        # GEX also provides call wall / put wall / gamma flip levels that
+        # the SignalSynthesizer uses for strike zone guidance.
+
+        if self._flashalpha and self._flashalpha.is_configured:
+            try:
+                gex = self._flashalpha.get_exposure_summary(symbol)
+                result["gex_data"] = gex
+
+                if gex.get("gex_available"):
+                    gamma_regime = gex.get("gamma_regime", "UNKNOWN")
+                    current_regime = result["vol_regime"]
+
+                    # Negative gamma amplifies moves — bump regime up
+                    if gamma_regime == "NEGATIVE":
+                        if current_regime == "NORMAL":
+                            result["vol_regime"] = "HIGH_VOL"
+                            result["regime_note"] += (
+                                f" | GEX: Negative gamma (flip at "
+                                f"${gex.get('gamma_flip', 0):.2f}) — "
+                                f"dealers amplifying moves, upgraded to HIGH_VOL"
+                            )
+                            result["strategy_hint"] = (
+                                "Sell premium with WIDER strikes — negative gamma "
+                                "means bigger-than-expected moves are likely"
+                            )
+                        elif current_regime == "HIGH_VOL":
+                            result["vol_regime"] = "EXTREME"
+                            result["regime_note"] += (
+                                f" | GEX: Negative gamma confirms elevated risk — "
+                                f"upgraded to EXTREME"
+                            )
+                            result["strategy_hint"] = (
+                                "Sell premium with VERY WIDE strikes or wait — "
+                                "negative gamma + high HV = storm conditions"
+                            )
+
+                    # Positive gamma dampens moves — great for premium selling
+                    elif gamma_regime == "POSITIVE":
+                        if current_regime == "EXTREME":
+                            result["vol_regime"] = "HIGH_VOL"
+                            result["regime_note"] += (
+                                f" | GEX: Positive gamma (flip at "
+                                f"${gex.get('gamma_flip', 0):.2f}) — "
+                                f"dealers dampening moves, downgraded to HIGH_VOL"
+                            )
+                        if current_regime in ("HIGH_VOL", "EXTREME"):
+                            result["strategy_hint"] = (
+                                "Premium selling sweet spot — positive gamma means "
+                                "dealers absorb moves + high IV = rich premiums"
+                            )
+
+                    # Add wall levels to result for strike guidance
+                    if gex.get("call_wall", 0) > 0:
+                        result["call_wall"] = gex["call_wall"]
+                    if gex.get("put_wall", 0) > 0:
+                        result["put_wall"] = gex["put_wall"]
+                    if gex.get("gamma_flip", 0) > 0:
+                        result["gamma_flip"] = gex["gamma_flip"]
+
+            except Exception as e:
+                # GEX is supplemental — don't fail the whole analysis
+                result["gex_data"] = {"error": str(e), "gex_available": False}
 
         return result
 
@@ -707,6 +802,32 @@ class SignalSynthesizer:
                 f"cheap options favor buying premium strategies"
             )
 
+        # Vote 3b: FlashAlpha GEX data (supplemental color)
+        gex_data = volatility.get("gex_data")
+        if gex_data and gex_data.get("gex_available"):
+            gamma_regime = gex_data.get("gamma_regime", "UNKNOWN")
+            gamma_flip = gex_data.get("gamma_flip", 0)
+            call_wall = gex_data.get("call_wall", 0)
+            put_wall = gex_data.get("put_wall", 0)
+
+            if gamma_regime == "POSITIVE":
+                bull_case.append(
+                    f"[GEX] Positive gamma regime — dealers dampen moves. "
+                    f"Flip at ${gamma_flip:.2f}. Favorable for premium selling."
+                )
+            elif gamma_regime == "NEGATIVE":
+                bear_case.append(
+                    f"[GEX] Negative gamma regime — dealers amplify moves. "
+                    f"Flip at ${gamma_flip:.2f}. Use wider strikes or wait."
+                )
+
+            # Add wall levels to strike guidance context
+            if call_wall > 0 and put_wall > 0:
+                bull_case.append(
+                    f"[GEX] Key levels: Call wall ${call_wall:.2f} / "
+                    f"Put wall ${put_wall:.2f} — use as strike zone anchors"
+                )
+
         # ── Determine overall direction ───────────────────────────────────
         if bullish_votes > bearish_votes:
             direction = "BULLISH"
@@ -749,6 +870,14 @@ class SignalSynthesizer:
             adjustments += 5
         if vol_regime == "LOW_VOL" and direction == "BULLISH":
             adjustments += 5
+
+        # GEX alignment bonus: +5 if gamma regime supports the trade direction
+        if gex_data and gex_data.get("gex_available"):
+            gamma_regime = gex_data.get("gamma_regime", "UNKNOWN")
+            if gamma_regime == "POSITIVE" and direction in ("NEUTRAL", "BULLISH"):
+                adjustments += 5  # Positive gamma = mean-reversion = premium selling works
+            elif gamma_regime == "NEGATIVE" and direction in ("BULLISH", "BEARISH"):
+                adjustments += 3  # Directional plays benefit from amplified moves
 
         # Penalize if agents had errors
         if technical.get("error"):
@@ -1084,23 +1213,45 @@ class TradePrep:
         atr = signal.get("atr_14", 0)
         cp = signal.get("current_price", current_price)
 
+        # Use GEX walls for strike guidance if available, otherwise ATR
+        gex_data = signal.get("_gex_data") or {}
+        call_wall = gex_data.get("call_wall", 0) if gex_data.get("gex_available") else 0
+        put_wall = gex_data.get("put_wall", 0) if gex_data.get("gex_available") else 0
+        gamma_flip = gex_data.get("gamma_flip", 0) if gex_data.get("gex_available") else 0
+
         if atr > 0 and cp > 0:
             otm_offset = atr * 1.0  # ~1 ATR out of the money
+
+            # Build GEX-informed strike guidance
+            gex_note = ""
+            if call_wall > 0 and put_wall > 0:
+                gex_note = (
+                    f" GEX levels: call wall ${call_wall:.2f}, "
+                    f"put wall ${put_wall:.2f}, "
+                    f"gamma flip ${gamma_flip:.2f}."
+                )
+
             if direction == "BULLISH":
+                strike_low = put_wall if put_wall > 0 else (cp - otm_offset)
                 suggested_strikes = (
-                    f"Look for strikes near ${cp:.2f} (ATM) to ${cp - otm_offset:.2f} "
-                    f"(~1 ATR below). Pull the live options chain for exact strikes."
+                    f"Look for strikes near ${cp:.2f} (ATM) to ${strike_low:.2f} "
+                    f"(~1 ATR below / put wall).{gex_note} "
+                    f"Pull the live options chain for exact strikes."
                 )
             elif direction == "BEARISH":
+                strike_high = call_wall if call_wall > 0 else (cp + otm_offset)
                 suggested_strikes = (
-                    f"Look for strikes near ${cp:.2f} (ATM) to ${cp + otm_offset:.2f} "
-                    f"(~1 ATR above). Pull the live options chain for exact strikes."
+                    f"Look for strikes near ${cp:.2f} (ATM) to ${strike_high:.2f} "
+                    f"(~1 ATR above / call wall).{gex_note} "
+                    f"Pull the live options chain for exact strikes."
                 )
             else:  # NEUTRAL
+                put_strike = put_wall if put_wall > 0 else (cp - otm_offset)
+                call_strike = call_wall if call_wall > 0 else (cp + otm_offset)
                 suggested_strikes = (
-                    f"Target short strikes ~1–2 ATR from current price "
-                    f"(${cp - otm_offset:.2f} put side / ${cp + otm_offset:.2f} call side). "
-                    f"Pull the live options chain for exact strikes."
+                    f"Target short strikes: "
+                    f"${put_strike:.2f} put side / ${call_strike:.2f} call side."
+                    f"{gex_note} Pull the live options chain for exact strikes."
                 )
         else:
             suggested_strikes = "Pull the live options chain to select strikes."
@@ -1153,10 +1304,14 @@ def run_pipeline(
     existing_positions: int = 0,
     news_data: Optional[list[dict]] = None,
     min_confidence: int = 60,
+    flashalpha_api_key: Optional[str] = None,
+    use_finviz_watchlist: bool = False,
+    finviz_max_tickers: int = 10,
 ) -> list[dict]:
     """
     Run the full 3-layer multi-agent pipeline on a watchlist.
 
+    Layer 0 (optional) → Finviz unusual volume scan for dynamic watchlist
     Layer 1 → Layer 2 → Layer 3, applied to each ticker in the watchlist.
     Tickers with insufficient signal confidence or failing risk checks are
     filtered out. Returns at most 3 recommendations, sorted by confidence.
@@ -1168,6 +1323,11 @@ def run_pipeline(
         news_data:          Optional pre-scored news items from Perplexity cron.
                             If None, NewsAgent returns neutral placeholders.
         min_confidence:     Minimum confidence score to include in output (default 60)
+        flashalpha_api_key: Optional FlashAlpha API key for GEX data.
+                            Falls back to FLASHALPHA_API_KEY env var.
+        use_finviz_watchlist: If True, scan Finviz for unusual volume tickers
+                              and merge with the provided watchlist.
+        finviz_max_tickers:   Max tickers to pull from Finviz (default 10).
 
     Returns:
         List of trade card dicts (from TradePrep.prepare()), sorted by
@@ -1178,13 +1338,33 @@ def run_pipeline(
         for trade in trades:
             print(trade["symbol"], trade["confidence_score"], trade["strategy"])
     """
-    # Initialize all 6 agents
+    # ── Layer 0: Dynamic watchlist from Finviz (optional) ────────────
+    if use_finviz_watchlist:
+        print("  [Layer 0] Finviz unusual volume scan...")
+        scanner = FinvizVolumeScanner()
+        finviz_tickers = scanner.scan_tickers_only(max_tickers=finviz_max_tickers)
+        if finviz_tickers:
+            print(f"           Found {len(finviz_tickers)} unusual volume tickers: {finviz_tickers}")
+            # Merge: Finviz tickers first (they have the signal), then provided watchlist
+            merged = list(dict.fromkeys(finviz_tickers + watchlist))  # dedup, preserve order
+            watchlist = merged[:15]  # cap at 15 to keep runtime reasonable
+            print(f"           Merged watchlist ({len(watchlist)}): {watchlist}")
+        else:
+            print("           No unusual volume tickers found — using provided watchlist")
+
+    # ── Initialize all agents ────────────────────────────────────────
+    fa_source = FlashAlphaSource(api_key=flashalpha_api_key)
     news_agent = NewsAgent()
     tech_agent = TechnicalAgent()
-    vol_agent = VolatilityAgent()
+    vol_agent = VolatilityAgent(flashalpha_source=fa_source)
     synthesizer = SignalSynthesizer()
     risk_mgr = RiskManager()
     prep = TradePrep()
+
+    if fa_source.is_configured:
+        print("  [Config] FlashAlpha GEX: ENABLED (API key configured)")
+    else:
+        print("  [Config] FlashAlpha GEX: DISABLED (set FLASHALPHA_API_KEY to enable)")
 
     recommendations: list[dict] = []
     skipped: list[dict] = []
@@ -1227,14 +1407,27 @@ def run_pipeline(
                   f"Vol%ile: {volatility['vol_percentile']:.0f}th | "
                   f"Regime: {volatility['vol_regime']}")
 
+        # Display GEX data if available
+        gex = volatility.get("gex_data")
+        if gex and gex.get("gex_available"):
+            print(f"           GEX: {gex['gamma_regime']} gamma | "
+                  f"Flip: ${gex.get('gamma_flip', 0):.2f} | "
+                  f"Call wall: ${gex.get('call_wall', 0):.2f} | "
+                  f"Put wall: ${gex.get('put_wall', 0):.2f}")
+        elif gex and gex.get("error"):
+            print(f"           GEX: unavailable ({gex['error'][:60]})")
+        else:
+            print(f"           GEX: not configured (set FLASHALPHA_API_KEY to enable)")
+
         # ── LAYER 2: Strategy ─────────────────────────────────────────────
 
         print(f"  [Layer 2] SignalSynthesizer running bull/bear debate...")
 
-        # Pass current_price and atr into signal for TradePrep to use
+        # Pass current_price, atr, and GEX data into signal for TradePrep
         signal = synthesizer.synthesize(news_summary, technical, volatility)
         signal["current_price"] = technical.get("current_price", 0)
         signal["atr_14"] = technical.get("atr_14", 0)
+        signal["_gex_data"] = volatility.get("gex_data")
 
         print(f"           Direction: {signal['direction']} | "
               f"Confidence: {signal['confidence']}/100 | "

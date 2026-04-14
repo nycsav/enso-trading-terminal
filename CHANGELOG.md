@@ -4,6 +4,39 @@ All notable changes to the Enso Trading Terminal are documented here.
 
 ---
 
+## [v0.7.0] — 2026-04-14 — FlashAlpha GEX + Finviz Unusual Volume Integration
+
+### Added
+- **modules/market_data_sources.py** — External data source integrations (561 lines)
+  - `FlashAlphaSource` — Real-time gamma exposure (GEX) via FlashAlpha API
+    - Per-strike GEX with call/put breakdown
+    - Gamma flip level, call wall, put wall
+    - Dealer regime classification (positive/negative gamma)
+    - Free tier: 5 req/day, no credit card
+  - `FinvizVolumeScanner` — Unusual volume stock screener
+    - Filters: optionable, price > $10, avg volume > 1M
+    - Dynamic watchlist generator ("Layer 0")
+    - Fallback to default large-cap list if scan fails
+
+### Changed
+- **modules/agent_framework.py** — Upgraded to 1,572 lines with two major enhancements:
+  - `VolatilityAgent` now accepts FlashAlpha source — GEX data refines vol regime:
+    - Negative gamma + NORMAL → bumped to HIGH_VOL (amplified moves)
+    - Negative gamma + HIGH_VOL → bumped to EXTREME
+    - Positive gamma + EXTREME → downgraded to HIGH_VOL (dampened)
+  - `SignalSynthesizer` uses GEX in bull/bear debate (gamma regime + wall levels)
+  - `TradePrep` uses call wall / put wall for strike zone guidance (replaces ATR-only)
+  - `run_pipeline()` gains 3 new params: `flashalpha_api_key`, `use_finviz_watchlist`, `finviz_max_tickers`
+  - Pipeline now shows GEX data in console output when available
+- **requirements.txt** — Added `finvizfinance>=1.0.0` and `flashalpha>=0.1.0`
+
+### Data Sources
+- FlashAlpha Lab API: https://flashalpha.com/docs/lab-api-gex
+- Finviz screener: https://finviz.com/screener.ashx
+- finvizfinance library: https://github.com/lit26/finvizfinance
+
+---
+
 ## [v0.6.0] — 2026-04-14 — Multi-Agent Trading Framework
 
 ### Added
