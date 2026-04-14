@@ -4,6 +4,29 @@ All notable changes to the Enso Trading Terminal are documented here.
 
 ---
 
+## [v0.8.0] — 2026-04-14 — Price Watcher (Fibonacci Exit Automation)
+
+### Added
+- **modules/price_watcher.py** — Monitors underlying stock prices and auto-exits options (456 lines)
+  - `PriceWatcher` checks underlying price via Public.com SDK (yfinance fallback)
+  - `WatchlistEntry` stores target price, direction (ABOVE/BELOW), option to sell
+  - JSON-based watchlist persistence (`price_watchlist.json`)
+  - Auto-places LIMIT SELL on option when underlying hits Fibonacci target
+  - Limit price = bid minus configurable offset (default 2%) for fast fill
+  - CLI interface: add, list, cancel, test (dry-run), check (live)
+  - Designed for Perplexity cron: `check_all_alerts()` runs every 30 min
+  - `format_summary()` produces notification-ready output
+- **test_price_watcher.py** — End-to-end module test (all 6 tests pass)
+
+### How It Works
+1. User identifies Fibonacci resistance on ThinkOrSwim (e.g., NVDA at $142)
+2. User buys option on Public.com
+3. User tells Perplexity: "Watch NVDA at $142, sell my call when it hits"
+4. Perplexity cron checks price every 30 min during market hours
+5. When underlying crosses target → LIMIT SELL placed on option → notification sent
+
+---
+
 ## [v0.7.0] — 2026-04-14 — FlashAlpha GEX + Finviz Unusual Volume Integration
 
 ### Added
