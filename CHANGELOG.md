@@ -4,6 +4,26 @@ All notable changes to the Enso Trading Terminal are documented here.
 
 ---
 
+## [v0.6.0] — 2026-04-14 — Multi-Agent Trading Framework
+
+### Added
+- **modules/agent_framework.py** — 3-layer, 6-agent trading intelligence engine (1,380 lines)
+  - Layer 1 (Intelligence): NewsAgent, TechnicalAgent, VolatilityAgent
+  - Layer 2 (Strategy): SignalSynthesizer with bull/bear debate pattern
+  - Layer 3 (Execution): RiskManager + TradePrep
+  - `run_pipeline()` entry point chains all agents, returns top 3 recommendations
+- **modules/strategy_map.py** — 9-strategy options mapping (direction + volatility regime → specific play)
+- **docs/multi-agent-architecture.md** — Full architecture design document
+- **Morning Market Scanner** — Perplexity cron job at 8:15 AM ET (weekdays) feeding Layer 1
+
+### Architecture Sources
+- QuantInsti multi-agent bot (analyst → portfolio → execution pipeline)
+- TradingAgents / UCLA+MIT (bull/bear debate for balanced analysis)
+- LLM-Enhanced-Trading (sentiment integration boosted TSLA Sharpe from 0.34 to 3.47)
+- FinRL-Trading (weight-centric architecture with Alpaca paper deployment)
+
+---
+
 ## [v0.5.0] — 2026-04-13 — Phase 1: Perplexity Automation (Stocks & Options)
 
 ### Added
