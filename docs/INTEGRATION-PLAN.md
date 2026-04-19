@@ -1,96 +1,96 @@
 # Enso Trading Terminal — Integration Plan & Task Backlog
 
-> Last updated: April 19, 2026  
+> Last updated: April 19, 2026 (post-audit)
 > Status: Living document — update as tasks complete
 
 ---
 
-## 🔴 Phase 1: Public.com API Integration (HIGH PRIORITY)
+## 📝 Audit Note (2026-04-19)
+
+A codebase audit reconciled this plan against the actual repo at commit
+`bc40157`. Tasks 1.1, 1.2, and 2.1 were already substantially built at the
+time the plan was drafted; see status markers below for pointers to the
+existing implementations.
+
+---
+
+## ✅ Phase 1: Public.com API Integration (COMPLETE)
 
 ### Task 1.1 — Wire `api_client.py` to Real Public.com SDK
 
-**Status:** 🔴 NOT STARTED — current file is a placeholder stub  
-**File:** `api_client.py` (modules/ or root)  
-**Account:** 5LF05438  
+**Status:** ✅ DONE (shipped v0.2.0)
+**File:** `modules/api_client.py` — 524-line wrapper around `public_api_sdk v0.1.10` (`publicdotcom-py`)
+**Account:** 5LF05438
 **Auth:** `PUBLIC_COM_SECRET` env var
 
-**What needs to happen:**
-- [ ] Install/import official Public.com Python SDK (or REST client)
-- [ ] Implement authentication with `PUBLIC_COM_SECRET`
-- [ ] Wire account data endpoints: positions, balances, order history
-- [ ] Wire market data endpoints: quotes, options chains
-- [ ] Replace all mock/stub returns with real API calls
-- [ ] Add error handling, rate limiting, retry logic
-- [ ] Add unit tests to cover API client methods
-
-**Reference:** `docs/api-opportunities-analysis.md` has endpoint research.
+Implementation covers:
+- Auth via `ApiKeyAuthConfig` with `PUBLIC_COM_SECRET`
+- Positions, balances, order history, quotes, options chains
+- Order placement + preflight, expirations, history
+- Lazy SDK install on import
 
 ---
 
-### Task 1.2 — Phase 1: Volatility Monitor (IV vs RV Gap Tracking)
+### Task 1.2 — Volatility Monitor (IV vs RV Gap Tracking)
 
-**Status:** 🔴 NOT STARTED  
-**Location:** New module — `modules/vol_monitor.py` (suggested)
+**Status:** ✅ DONE (shipped v0.3.0 + v0.6.0)
+**Existing implementations:**
+- `modules/strategy_engines.py::run_iv_rv_backtest` — 20-day realized vol,
+  IV-RV gap computation, threshold-based regime flags (HIGH_IV / LOW_IV).
+- `modules/agent_framework.py::VolatilityAgent` — 4-level regime classifier
+  (LOW_VOL / NORMAL / HIGH_VOL / EXTREME) with FlashAlpha gamma overlay that
+  bumps the regime on negative-gamma dealer states.
+- `modules/strategy_map.py` — 9-cell (direction × vol_regime) strategy matrix
+  used by the synthesizer to pick plays.
 
-**What needs to happen:**
-- [ ] Build IV (Implied Volatility) data pipeline — pull from options chain
-- [ ] Build RV (Realized Volatility) calculator — rolling window on price data
-- [ ] Compute IV vs RV gap (vol premium)
-- [ ] Define threshold alerts: e.g., IV/RV ratio > 1.3 = elevated premium
-- [ ] Surface gap data as a signal input for strategy selection
-- [ ] Add vol regime classification: `low / normal / elevated / extreme`
-- [ ] Integrate display into Dash UI (new chart or indicator panel)
-
-**Design notes:**
-- Use 20-day RV to match existing S/R engine lookback period
-- IV source: Public.com options chain once API is live; yfinance options as fallback
+**Remaining polish (optional, not blocking):**
+- [ ] Extract shared vol logic into a dedicated `modules/vol_monitor.py`
+- [ ] Add a vol-regime indicator panel to the Dash dashboard page
 
 ---
 
-## 🟡 Phase 2: Signal Filters (MEDIUM PRIORITY)
-
-All 3 filters below have been **approved in design** but not yet built.
+## 🟡 Phase 2: Signal Filters
 
 ### Task 2.1 — Vol Regime Filter
 
-**Status:** 🟡 APPROVED, NOT BUILT  
-**Depends on:** Task 1.2 (vol_monitor.py)  
-**Location:** `modules/signal_filters.py` (new) or inline in strategy engine
+**Status:** ✅ DONE (effectively — implemented via strategy map, not a separate filter)
+**Rationale:** The design goal (gate strategy selection by vol regime) is
+already satisfied by `VolatilityAgent` → `strategy_map.get_strategy(direction, vol_regime)`.
+Adding a standalone filter would duplicate this gating.
 
-**Logic:**
-- [ ] Gate strategy signals based on current vol regime
-- [ ] `low vol` → favor debit spreads, long gamma
-- [ ] `elevated vol` → favor credit spreads, short premium
-- [ ] `extreme vol` → block new entries, manage existing positions only
-- [ ] Config thresholds in `config.py`
+If a blocking filter (rather than strategy-selection gate) is still wanted,
+this can be revisited as a follow-up; leaving closed for now.
 
 ---
 
 ### Task 2.2 — Time-of-Day Filter
 
-**Status:** 🟡 APPROVED, NOT BUILT  
-**Location:** `modules/signal_filters.py`
+**Status:** ✅ DONE (shipped v0.9.0)
+**File:** `modules/signal_filters.py::TimeOfDayFilter`
+**Tests:** `test_signal_filters.py` (9 cases pass)
 
-**Logic:**
-- [ ] Block signal generation during first 30 min (9:30–10:00 ET) — avoid open volatility
-- [ ] Block signal generation last 15 min (3:45–4:00 ET) — avoid close slippage
-- [ ] Flag signals generated within 30 min of major economic releases
-- [ ] All times in US/Eastern; handle DST correctly
-- [ ] Make windows configurable via `config.py`
+Implementation:
+- Blocks first `TOD_OPEN_BUFFER_MIN` minutes after open (default 30)
+- Blocks last `TOD_CLOSE_BUFFER_MIN` minutes before close (default 15)
+- Blocks weekends + pre/post-market
+- Blocks ±`TOD_ECON_RELEASE_BUFFER_MIN` around econ releases passed via context
+- ET timezone, DST-safe (`zoneinfo.ZoneInfo("America/New_York")`)
 
 ---
 
 ### Task 2.3 — Failed Breakdown Filter
 
-**Status:** 🟡 APPROVED, NOT BUILT  
-**Location:** `modules/signal_filters.py`
+**Status:** ✅ DONE (shipped v0.9.0)
+**File:** `modules/signal_filters.py::FailedBreakdownFilter`
+**Tests:** `test_signal_filters.py` (7 cases pass)
 
-**Logic:**
-- [ ] Detect when price breaks below S/R level but closes back above within N bars
-- [ ] Tag these as `failed_breakdown` events
-- [ ] Use as a bullish reversal signal input (failed breakdown = trapped shorts)
-- [ ] Define N (lookback bars) in `config.py` — suggested default: 3 bars
-- [ ] Integrate with existing S/R engine confluence scoring
+Implementation:
+- Scans the last `FAILED_BREAKDOWN_LOOKBACK` bars (default 3)
+- Detects pierce below support (with `FAILED_BREAKDOWN_TOLERANCE_PCT` tolerance)
+  followed by close back above support
+- Blocks bearish signals when detected (trapped shorts)
+- Tags bullish signals with `reversal_confirmation: true`
+- Composable via `FilterChain` with any other `SignalFilter`
 
 ---
 

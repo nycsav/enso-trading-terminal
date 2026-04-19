@@ -4,6 +4,37 @@ All notable changes to the Enso Trading Terminal are documented here.
 
 ---
 
+## [v0.9.0] — 2026-04-19 — Signal Filters (Time-of-Day + Failed Breakdown)
+
+### Added
+- **modules/signal_filters.py** — Composable signal gates (~185 lines)
+  - `TimeOfDayFilter` — blocks signals in the first 30 min after open and last
+    15 min before close; blocks weekends, pre/post-market, and a configurable
+    window around scheduled economic releases. ET timezone, DST-safe via
+    `zoneinfo.ZoneInfo("America/New_York")`.
+  - `FailedBreakdownFilter` — detects bars that pierce a support level but
+    close back above it within a configurable lookback. Blocks bearish entries
+    on detection (trapped shorts) and tags bullish signals as reversal
+    confirmations.
+  - `FilterChain` — ordered composition, short-circuits on first reject and
+    returns per-filter metadata.
+  - `default_chain()` — ships both filters in production order.
+- **test_signal_filters.py** — 20 unit tests, all pass, no network required.
+- **config.py** — New knobs: `TOD_OPEN_BUFFER_MIN`, `TOD_CLOSE_BUFFER_MIN`,
+  `TOD_ECON_RELEASE_BUFFER_MIN`, `FAILED_BREAKDOWN_LOOKBACK`,
+  `FAILED_BREAKDOWN_TOLERANCE_PCT`.
+
+### Fixed
+- **CLAUDE.md** — removed stale "`api_client.py` is a stub" claim (that module
+  has been a real 524-line SDK wrapper since v0.2.0) and refreshed the pending
+  task list to reflect what's actually outstanding.
+
+### Docs
+- **docs/INTEGRATION-PLAN.md** — marked Tasks 1.1, 1.2, 2.1 as already-built
+  with pointers to existing code; Tasks 2.2 and 2.3 are now done.
+
+---
+
 ## [v0.8.0] — 2026-04-14 — Price Watcher (Fibonacci Exit Automation)
 
 ### Added

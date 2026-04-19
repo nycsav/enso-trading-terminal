@@ -84,15 +84,18 @@ enso-trading-terminal/
 See `docs/INTEGRATION-PLAN.md` for full task details.
 
 ### 🔴 High Priority
-1. **`api_client.py` is a placeholder** — not wired to real Public.com SDK. Needs full implementation.
-2. **Phase 1: Vol Monitor** — IV vs RV gap tracking. Not started.
+_None outstanding — see `docs/INTEGRATION-PLAN.md` for audit details._
 
 ### 🟡 Medium Priority
-3. **3 Signal Filters** — approved but not built:
-   - `vol_regime` filter
-   - `time_of_day` filter  
+1. **2 Signal Filters** — approved but not built:
+   - `time_of_day` filter
    - `failed_breakdown` filter
-4. **`INTEGRATION-PLAN.md`** — was drafted locally, now pushed to `docs/`
+   - (`vol_regime` is already gated inside `modules/strategy_map.py` + `VolatilityAgent`)
+
+### ✅ Already Built (previously listed as pending)
+- `modules/api_client.py` — 524-line real `public_api_sdk v0.1.10` wrapper
+- IV/RV gap monitor — `modules/strategy_engines.py::run_iv_rv_backtest` (20-day RV, threshold alerts)
+- Vol regime classifier — `VolatilityAgent` in `modules/agent_framework.py` (LOW/NORMAL/HIGH/EXTREME with gamma overlay)
 
 ### 🟢 Low Priority / Nice to Have
 5. Additional backtest visualization improvements
@@ -137,7 +140,7 @@ gunicorn app:server
 - **`modules/`** contains the core trading engines — treat as stable, modify carefully
 - **`pages/`** contains Dash page layouts — UI changes go here
 - **`strategies/`** is documentation + specs, not executable code (yet)
-- **`api_client.py`** (in `modules/` or root) is a **stub** — do not rely on it for live data until wired to Public.com SDK
+- **`modules/api_client.py`** is a working 524-line wrapper around `public_api_sdk v0.1.10` (`publicdotcom-py`); import from here for all brokerage calls
 - The app uses **Dash multi-page** architecture — each file in `pages/` auto-registers as a route
 
 ---
