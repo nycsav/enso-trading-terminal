@@ -92,6 +92,15 @@ MARKET_CLOSE_HOUR = 16
 MARKET_CLOSE_MIN = 0
 
 # ---------------------------------------------------------------------------
+# Signal filter defaults (modules/signal_filters.py)
+# ---------------------------------------------------------------------------
+TOD_OPEN_BUFFER_MIN = 30            # block signals in first 30 min after open
+TOD_CLOSE_BUFFER_MIN = 15           # block signals in last 15 min before close
+TOD_ECON_RELEASE_BUFFER_MIN = 30    # block ±30 min around scheduled econ releases
+FAILED_BREAKDOWN_LOOKBACK = 3       # bars to scan for failed breakdown
+FAILED_BREAKDOWN_TOLERANCE_PCT = 0.1  # pct below support that counts as a pierce
+
+# ---------------------------------------------------------------------------
 # Theme colors (dark terminal aesthetic)
 # ---------------------------------------------------------------------------
 COLORS = {
